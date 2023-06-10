@@ -1,5 +1,5 @@
 const cheerio = require('cheerio');
-
+const f = require("./fetch");
 
 headers={
     "sec-ch-ua-mobile": "?0",
@@ -18,32 +18,38 @@ headers={
 class Wwk{
     constructor(){
         this.html=false;
+        this.type=false;
         this.querySelector=this.selector=this.select=this.$=function(dom){
+            this.type="html";
             if(!this.html){
-                return this.res.text().then(html=>{
-                    this.html=cheerio.load(html);
-                    return {html:this.html(dom).prop('outerHTML'),attr:a=>this.html(dom).attr(a)};
-                })
+                this.html=cheerio.load(this.res);
+                //console.log(this.html("p")["110"].children)
+                return {html:this.html(dom).prop('outerHTML'),text:this.html(dom).html(),attr:a=>this.html(dom).attr(a)};
             }
-            return new Promise(()=>this.html(dom).prop('outerHTML'));
+            return this.html(dom).prop('outerHTML');
+        }
+        this.create=async function(url,method,type="html"){
+            var o=await f(url,{method:method,headers:headers})
+            if(type=="html"){
+                this.res=await o.text()
+            }else if(type=="json"){
+                this.res=await o.json()
+            }else{throw("Type Error")}
+            this.type=type;
+            return this;
+        }
+        this.json=async function(){
+            return this.res;
         }
         return this;
-    }
-    create(url,method){
-        return fetch(url,{method:method,headers:headers}).then(r=>{this.res=r;return this})
-    }
-    json(){
-        return this.res.json()
     }
 }
 async function Wwker(urllist,fn){
     var result=[];
-    var tool=new Wwk();
     for(var i=0;i<urllist.length;i++){
         var url=urllist[i];
-        result.push(await tool.create(url["url"]||url[0],url["method"]||url[1]).then(p=>fn(p)))
+        result.push(await new Wwk().create(url["url"]||url[0],url["method"]||url[1]).then(p=>fn(p)))
     }
     return result;
 }
-module.exports=Wwk;
-module.exports=Wwker;
+module.exports={Wwk,Wwker};
